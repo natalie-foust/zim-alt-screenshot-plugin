@@ -1,0 +1,81 @@
+--- screenshot.orig.py	2020-02-19 17:55:40.455392469 -0500
++++ insert-screenshot-alt.py	2020-02-19 18:34:41.215344162 -0500
+@@ -104,18 +104,19 @@
+ 
+ class InsertScreenshotPlugin(PluginClass):
+ 	plugin_info = {
+-		'name': _('Insert Screenshot'),  # T: plugin name
++		'name': _('Insert Screenshot (Alternate)'),  # T: plugin name
+ 		'description': _('''\
+-This plugin  allows taking a screenshot and directly insert it
+-in a zim page.
++This plugin  allows taking a screenshot and directly insert it in a zim page. 
++It also adds in the option to hide Zim before taking the screenshot.
++
+ 
+-This is a core plugin shipping with zim.
+ '''),  # T: plugin description
+ 		'author': 'Jaap Karssenberg',
+ 		'help': 'Plugins:Insert Screenshot',
+ 	}
+ 	plugin_preferences = (
+ 		# key, type, label, default
++		('autohide', 'bool', _('Hide zim when taking a screenshot (good for small/single-monitor setups).'), False),
+ 		('screenshot_command', 'choice', _('Screenshot Command'), COMMAND, SUPPORTED_COMMANDS), # T: plugin preference
+ 	)
+ 	screenshot_cmd = COMMAND
+@@ -157,23 +158,26 @@
+ 	def on_preferences_changed(self, preferences):
+ 		if preferences['screenshot_command']:
+ 			self.screenshot_command = preferences['screenshot_command']
++		self.autohide = preferences['autohide']
+ 
+ 	@action(_('_Screenshot...'), menuhints='insert')  # T: menu item for insert screenshot plugin
+ 	def insert_screenshot(self):
+ 		notebook = self.pageview.notebook
+ 		page = self.pageview.page
+ 		dialog = InsertScreenshotDialog.unique(self, self.pageview, notebook, page,
+-											   self.plugin.preferences['screenshot_command'])
++											   self.plugin.preferences['screenshot_command'],
++											   self.plugin.preferences['autohide'])
+ 		dialog.show_all()
+ 
+ 
+ class InsertScreenshotDialog(Dialog):
+ 	screenshot_command = COMMAND
+ 
+-	def __init__(self, pageview, notebook, page, screenshot_command):
+-		Dialog.__init__(self, pageview, _('Insert Screenshot'))  # T: dialog title
++	def __init__(self, pageview, notebook, page, screenshot_command, autohide):
++		Dialog.__init__(self, pageview, _('Insert Screenshot (Alternate)'))  # T: dialog title
+ 		self.pageview = pageview
+ 		self.screenshot_command = screenshot_command
++		self.autohide = autohide
+ 		if ScreenshotPicker.has_select_cmd(self.screenshot_command):
+ 			self.screen_radio = Gtk.RadioButton.new_with_mnemonic_from_widget(None,
+ 												_('Capture whole screen'))  # T: option in 'insert screenshot' dialog
+@@ -184,6 +188,7 @@
+ 
+ 		self.notebook = notebook
+ 		self.page = page
++		self.topwindow = self.pageview.get_parent_window().get_toplevel()
+ 		if ScreenshotPicker.has_delay_cmd(self.screenshot_command):
+ 			hbox = Gtk.HBox()
+ 			self.vbox.add(hbox)
+@@ -209,6 +214,8 @@
+ 		helper = Application((self.screenshot_command,) + options)
+ 
+ 		def callback(status, tmpfile):
++			if self.autohide:
++				self.topwindow.show()
+ 			if status == helper.STATUS_OK:
+ 				name = time.strftime('screenshot_%Y-%m-%d-%H%M%S.png')
+ 				imgdir = self.notebook.get_attachments_dir(self.page)
+@@ -224,5 +231,7 @@
+ 		tmpfile.dir.touch()
+ 		fileop = ScreenshotPicker.get_file_option(self.screenshot_command)
+ 		args = (fileop, tmpfile) if fileop else (tmpfile,)
++		if self.autohide:
++			self.topwindow.iconify()
+ 		helper.spawn(args, callback, tmpfile)
+ 		return True
